@@ -5,10 +5,7 @@ import streamlit as st
 
 @st.cache_resource
 def get_server_store():
-    return {
-        "rooms": {},
-        "processed_payments": set(),
-    }
+    return {"rooms": {}}
 
 
 def generate_room_code(store):
