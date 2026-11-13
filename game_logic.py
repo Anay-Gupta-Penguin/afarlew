@@ -12,6 +12,19 @@ def init_game_state(game_type):
             "ships": {"P1": set(random.sample(grid, 3)), "P2": set(random.sample(grid, 3))},
             "shots": {"P1": set(), "P2": set()},
         }
+    if game_type == "Rock Paper Scissors":
+        return {"picks": {"P1": None, "P2": None}}
+    if game_type == "Checkers":
+        board = [["" for _ in range(6)] for _ in range(6)]
+        for r in range(2):
+            for c in range(6):
+                if (r + c) % 2 == 1:
+                    board[r][c] = "⚫"  # P2 pieces at top
+        for r in range(4, 6):
+            for c in range(6):
+                if (r + c) % 2 == 1:
+                    board[r][c] = "🔴"  # P1 pieces at bottom
+        return {"board": board}
 
 
 def check_ttt_winner(b):
