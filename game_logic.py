@@ -1,4 +1,10 @@
-import random
+FLEET_SPECS = [
+    ("Carrier", 5),
+    ("Battleship", 4),
+    ("Cruiser", 3),
+    ("Submarine", 3),
+    ("Destroyer", 2),
+]
 
 
 def init_game_state(game_type):
@@ -7,10 +13,12 @@ def init_game_state(game_type):
     if game_type == "Connect 4":
         return {"board": [["" for _ in range(7)] for _ in range(6)]}
     if game_type == "Battleship":
-        grid = [(r, c) for r in range(5) for c in range(5)]
         return {
-            "ships": {"P1": set(random.sample(grid, 3)), "P2": set(random.sample(grid, 3))},
+            "phase": "SETUP",
+            "ships": {"P1": {}, "P2": {}},   # e.g., {"Carrier": [(0,0), ...]}
+            "ready": {"P1": False, "P2": False},
             "shots": {"P1": set(), "P2": set()},
+            "last_event": "",
         }
     if game_type == "Rock Paper Scissors":
         return {"picks": {"P1": None, "P2": None}}
@@ -19,11 +27,11 @@ def init_game_state(game_type):
         for r in range(2):
             for c in range(6):
                 if (r + c) % 2 == 1:
-                    board[r][c] = "⚫"  # P2 pieces at top
+                    board[r][c] = "⚫"
         for r in range(4, 6):
             for c in range(6):
                 if (r + c) % 2 == 1:
-                    board[r][c] = "🔴"  # P1 pieces at bottom
+                    board[r][c] = "🔴"
         return {"board": board}
 
 
