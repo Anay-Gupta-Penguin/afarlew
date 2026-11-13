@@ -10,7 +10,7 @@ from ui_battleship import render_battleship
 from ui_rps import render_rps
 from ui_checkers import render_checkers
 
-st.set_page_config(page_title="Streamlit Arcade", page_icon="🎮", layout="centered")
+st.set_page_config(page_title="Streamlit Arcade", page_icon="🎮", layout="wide")
 store = get_server_store()
 
 if "player_id" not in st.session_state:
@@ -19,7 +19,6 @@ if "room_code" not in st.session_state:
     st.session_state.room_code = None
 
 st.title("🎮 Multiplayer Game Arcade")
-
 GAMES = ["Tic-Tac-Toe", "Connect 4", "Battleship", "Rock Paper Scissors", "Checkers"]
 
 if not st.session_state.room_code:
@@ -77,8 +76,11 @@ else:
                 room["state"] = init_game_state(room["game"])
                 room["winner"], room["counted"], room["turn"] = None, False, "P1"
                 st.rerun()
-        elif room["game"] != "Rock Paper Scissors":
-            st.success("🟢 Your Turn!") if room["turn"] == role else st.info(f"⏳ Waiting for {room['turn']}...")
+        elif room["game"] not in ("Rock Paper Scissors", "Battleship"):
+            if room["turn"] == role:
+                st.success("🟢 Your Turn!")
+            else:
+                st.info(f"⏳ Waiting for {room['turn']}...")
 
         my_turn = (room["turn"] == role) and (room["winner"] is None)
         g = room["game"]
