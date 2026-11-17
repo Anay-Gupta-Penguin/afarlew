@@ -11,11 +11,15 @@ from ui_battleship import render_battleship
 from ui_rps import render_rps
 from ui_checkers import render_checkers
 
-st.set_page_config(page_title="SHS Arcade", page_icon="🎮", layout="wide")
+st.set_page_config(page_title="SHS Arcade", page_icon="🎮", layout="wide", initial_sidebar_state="collapsed")
 
-# Prevent game grids from stacking vertically on mobile screens
+# Fix top header clipping and keep game grids horizontal on mobile
 st.markdown("""
 <style>
+.block-container {
+    padding-top: 2rem !important;
+    padding-bottom: 1rem !important;
+}
 div[data-testid="stHorizontalBlock"] {
     flex-wrap: nowrap !important;
     gap: 0.25rem !important;
@@ -28,7 +32,6 @@ div[data-testid="stHorizontalBlock"] > div {
 
 store = get_server_store()
 
-# Prune inactive rooms older than 2 hours
 now = time.time()
 expired = [k for k, v in store["rooms"].items() if now - v.get("last_active", now) > 7200]
 for k in expired:
@@ -41,11 +44,11 @@ if "room_code" not in st.session_state:
 if "nickname" not in st.session_state:
     st.session_state.nickname = ""
 
-st.title("🎮 Multiplayer Game Arcade")
 GAMES = ["Tic-Tac-Toe", "Connect 4", "Battleship", "Rock Paper Scissors", "Checkers"]
 
 if not st.session_state.room_code:
-    name_input = st.text_input("Your Nickname (optional)", value=st.session_state.nickname, max_chars=16, placeholder="e.g. Alex")
+    st.title("🎮 Multiplayer Game Arcade")
+    name_input = st.text_input("Your Nickname (optional)", value=st.session_state.nickname, max_chars=16, placeholder="e.g. Anay")
     st.session_state.nickname = name_input.strip()
 
     prefill_code = st.query_params.get("room", "").upper()[:4]
@@ -89,16 +92,9 @@ if not st.session_state.room_code:
                 st.query_params["room"] = join_code
                 st.rerun()
 else:
-    if st.sidebar.button("🚪 Leave Room", use_container_width=True):
-        st.session_state.room_code = None
-        st.session_state.chk_sel = None
-        st.query_params.clear()
-        st.rerun()
-
     code = st.session_state.room_code
     room = store["rooms"].get(code)
 
-    # Guard against expired rooms or server restarts
     if not room:
         st.warning("This room expired or the server restarted.")
         st.session_state.room_code = None
@@ -113,10 +109,18 @@ else:
     @st.fragment(run_every=2)
     def live_match():
         s = room["scores"]
-        st.info(
-            f"**{room['game']}** | Room: `{code}` | You: **{names[role]} ({role})** | "
-            f"Score — {names['P1']}: **{s['P1']}** · {names['P2']}: **{s['P2']}** · Draws: **{s['DRAW']}**"
-        )
+        bar_left, bar_right = st.columns([6, 1])
+        with bar_left:
+            st.info(
+                f"**{room['game']}** | Room: `{code}` | You: **{names[role]} ({role})** | "
+                f"Score — {names['P1']}: **{s['P1']}** · {names['P2']}: **{s['P2']}** · Draws: **{s['DRAW']}**"
+            )
+        with bar_right:
+            if st.button("🚪 Leave", use_container_width=True):
+                st.session_state.room_code = None
+                st.session_state.chk_sel = None
+                st.query_params.clear()
+                st.rerun()
 
         if not room["p2"]:
             st.warning(f"Share code **{code}** (or copy the page URL) with Player 2 to start!")
