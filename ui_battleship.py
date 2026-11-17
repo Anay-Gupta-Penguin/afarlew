@@ -22,6 +22,16 @@ def _place_random(ships_dict):
                 break
 
 
+def _draw_col_headers():
+    hdr = st.columns([0.5] + [1] * 10)
+    hdr[0].markdown("")
+    for c in range(10):
+        hdr[c + 1].markdown(
+            f"<div style='text-align:center;font-weight:700;font-size:13px;line-height:1.2;padding-bottom:16px;'>{c+1}</div>",
+            unsafe_allow_html=True,
+        )
+
+
 def _draw_aligned_ocean(ships_dict, shots_taken):
     occ = _occupied(ships_dict)
     cells = [
@@ -49,7 +59,6 @@ def _draw_aligned_ocean(ships_dict, shots_taken):
 
 
 def render_battleship(room, role, my_turn):
-    # Tighten row spacing & button height so all 10 rows (A-J) fit without scrolling
     st.markdown("""
     <style>
     div[data-testid="stColumn"] div[data-testid="stVerticalBlock"],
@@ -114,13 +123,7 @@ def render_battleship(room, role, my_turn):
         with right:
             st.markdown("**Your Ocean Board** *(Click a square to place)*")
             occ = _occupied(my_ships)
-            hdr = st.columns([0.5] + [1] * 10)
-            hdr[0].markdown("")
-            for c in range(10):
-                hdr[c + 1].markdown(
-                    f"<div style='text-align:center;font-weight:700;font-size:12px;'>{c+1}</div>",
-                    unsafe_allow_html=True,
-                )
+            _draw_col_headers()
 
             for r in range(10):
                 row_cols = st.columns([0.5] + [1] * 10)
@@ -164,13 +167,7 @@ def render_battleship(room, role, my_turn):
         if sunk_names:
             st.caption("Sunk: " + ", ".join(sunk_names))
 
-        hdr = st.columns([0.5] + [1] * 10)
-        hdr[0].markdown("")
-        for c in range(10):
-            hdr[c + 1].markdown(
-                f"<div style='text-align:center;font-weight:700;font-size:12px;'>{c+1}</div>",
-                unsafe_allow_html=True,
-            )
+        _draw_col_headers()
 
         for r in range(10):
             row_cols = st.columns([0.5] + [1] * 10)
