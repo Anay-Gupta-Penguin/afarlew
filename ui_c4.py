@@ -8,7 +8,8 @@ def render_c4(room, role, my_turn):
 
     drop_cols = st.columns(7)
     for c in range(7):
-        disabled = (not my_turn) or (board[c] != "")
+        # Check top cell of column c (board[0][c]), not board[c]
+        disabled = (not my_turn) or (board[0][c] != "")
         if drop_cols[c].button(f"⬇️ {c+1}", key=f"c4_{c}", disabled=disabled, use_container_width=True):
             for r in range(5, -1, -1):
                 if board[r][c] == "":
@@ -27,4 +28,4 @@ def render_c4(room, role, my_turn):
 
     for r in range(6):
         row_str = " ".join(board[r][c] if board[r][c] else "⚪" for c in range(7))
-        st.markdown(f"<h3 style='text-align:center; margin:0;'>{row_str}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='text-align:center; margin:0; letter-spacing:4px;'>{row_str}</h3>", unsafe_allow_html=True)
