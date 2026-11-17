@@ -15,7 +15,7 @@ def init_game_state(game_type):
     if game_type == "Battleship":
         return {
             "phase": "SETUP",
-            "ships": {"P1": {}, "P2": {}},   # e.g., {"Carrier": [(0,0), ...]}
+            "ships": {"P1": {}, "P2": {}},
             "ready": {"P1": False, "P2": False},
             "shots": {"P1": set(), "P2": set()},
             "last_event": "",
@@ -57,4 +57,5 @@ def check_c4_winner(b):
                 return p
             if r - 3 >= 0 and c + 3 < 7 and p == b[r-1][c+1] == b[r-2][c+2] == b[r-3][c+3]:
                 return p
-    return "DRAW" if all(b[c] != "" for c in range(7)) else None
+    # Check top row (row 0) for full columns
+    return "DRAW" if all(b[0][c] != "" for c in range(7)) else None
