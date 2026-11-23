@@ -1,7 +1,8 @@
 import random
 
 GAMES = {
-    "Battle Royale": {"min": 2, "max": 8, "desc": "2–8 Players · 3D shrinking-arena survival"},
+    "1v1.LOL": {"min": 1, "max": 4, "desc": "1–4 Players · 3D Build Fight, Turbo-Build & Edits"},
+    "Battle Royale": {"min": 1, "max": 8, "desc": "1–8 Players · 3D Fortnite Island, Chests & Storm"},
     "Connect 4": {"min": 2, "max": 2, "desc": "2 Players · Drop 4 in a row"},
     "Tic-Tac-Toe": {"min": 2, "max": 2, "desc": "2 Players · Classic 3×3 grid"},
     "Checkers": {"min": 2, "max": 2, "desc": "2 Players · Diagonal jumps & kings"},
