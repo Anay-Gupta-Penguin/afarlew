@@ -2,6 +2,8 @@ import random
 import string
 import streamlit as st
 
+PLAYER_BADGES = ["🔴", "🟡", "🟢", "🔵", "🟣", "🟠", "🟤", "⚪"]
+
 
 @st.cache_resource
 def get_server_store():
