@@ -22,19 +22,27 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.markdown("""
+if "full_view" not in st.session_state:
+    st.session_state.full_view = False
+
+pad_top = "0.6rem" if st.session_state.full_view else "2.4rem"
+header_css = "header[data-testid='stHeader'] { display: none !important; }" if st.session_state.full_view else ""
+
+st.markdown(f"""
 <style>
-.block-container {
-    padding-top: 2.6rem !important;
-    padding-bottom: 1.5rem !important;
-}
-div[data-testid="stHorizontalBlock"] {
+{header_css}
+.block-container {{
+    padding-top: {pad_top} !important;
+    padding-bottom: 1.2rem !important;
+    max-width: {"100%" if st.session_state.full_view else "1200px"} !important;
+}}
+div[data-testid="stHorizontalBlock"] {{
     flex-wrap: nowrap !important;
-    gap: 0.3rem !important;
-}
-div[data-testid="stHorizontalBlock"] > div {
+    gap: 0.35rem !important;
+}}
+div[data-testid="stHorizontalBlock"] > div {{
     min-width: 0 !important;
-}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -57,10 +65,15 @@ REALTIME_3D_GAMES = ("1v1.LOL", "Battle Royale")
 
 
 def _join_room(code):
+    code = (code or "").upper().strip()
+    if not code:
+        st.error("Enter a 4-character room code.")
+        return
     room = store["rooms"].get(code)
     if not room:
-        st.error("Room not found.")
+        st.error(f"Room `{code}` not found.")
         return
+
     meta = GAMES[room["game"]]
     already_in = my_pid in room["players"]
     if not already_in and len(room["players"]) >= meta["max"]:
@@ -76,13 +89,14 @@ def _join_room(code):
         room["names"][my_pid] = st.session_state.nickname or f"Player {idx + 1}"
         room["badges"][my_pid] = PLAYER_BADGES[idx % len(PLAYER_BADGES)]
         room["scores"][my_pid] = 0
-        if meta["max"] == 2 and len(room["players"]) == 2:
+        if room["game"] not in REALTIME_3D_GAMES and meta["max"] == 2 and len(room["players"]) == 2:
             room["started"] = True
             room["state"] = init_game_state(room["game"], room["players"])
+
     room["last_active"] = time.time()
     st.session_state.room_code = code
     st.query_params["room"] = code
-    st.rerun()
+    st.rerun(scope="app")
 
 
 # --- LOBBY ---
@@ -122,11 +136,11 @@ if not st.session_state.room_code:
                 "counted": False,
                 "last_active": time.time(),
                 "scores": {my_pid: 0, "DRAW": 0},
-                "state": init_game_state(game_choice, [my_pid]),
+                "state": {},
             }
             st.session_state.room_code = code
             st.query_params["room"] = code
-            st.rerun()
+            st.rerun(scope="app")
 
     with col2:
         st.subheader("Join by Room Code")
@@ -138,7 +152,6 @@ if not st.session_state.room_code:
         if st.button("Join Room", use_container_width=True):
             _join_room(join_code)
 
-    # --- LIVE OPEN ROOMS BROWSER (Auto-refreshes every 3s) ---
     @st.fragment(run_every=3)
     def open_rooms_list():
         st.divider()
@@ -174,8 +187,9 @@ else:
     if not room or my_pid not in room["players"]:
         st.warning("This room expired or you were disconnected.")
         st.session_state.room_code = None
+        st.query_params.clear()
         if st.button("Back to Lobby"):
-            st.rerun()
+            st.rerun(scope="app")
         st.stop()
 
     room["last_active"] = time.time()
@@ -191,7 +205,7 @@ else:
             st.info(
                 f"**{title_label}** · Room `{code}` · "
                 f"You: **{room['badges'][my_pid]} {room['names'][my_pid]}** · "
-                f"Friends can join from the Home Lobby or code `{code}`!"
+                f"Share code `{code}` or join from the Home Lobby!"
             )
         with bar_right:
             if st.button("🚪 Leave", use_container_width=True):
@@ -203,7 +217,7 @@ else:
                         del store["rooms"][code]
                 st.session_state.room_code = None
                 st.query_params.clear()
-                st.rerun()
+                st.rerun(scope="app")
 
         render_br(room, my_pid, arena_mode=mode_tag)
         st.stop()
@@ -220,12 +234,17 @@ else:
         if scores.get("DRAW", 0) > 0:
             score_parts.append(f"Draws: **{scores['DRAW']}**")
 
-        bar_left, bar_right = st.columns([6.5, 1], vertical_alignment="center")
+        bar_left, bar_fs, bar_right = st.columns([5.8, 1.1, 1], vertical_alignment="center")
         with bar_left:
             st.info(
                 f"**{room['game']}** · Room `{code}` · You: **{badges[my_pid]} {names[my_pid]}** · "
                 + " · ".join(score_parts)
             )
+        with bar_fs:
+            fs_lbl = "🗗 Exit Full" if st.session_state.full_view else "⛶ Fullscreen"
+            if st.button(fs_lbl, use_container_width=True):
+                st.session_state.full_view = not st.session_state.full_view
+                st.rerun(scope="app")
         with bar_right:
             if st.button("🚪 Leave", use_container_width=True):
                 if my_pid in room["players"]:
@@ -240,11 +259,11 @@ else:
                 st.session_state.room_code = None
                 st.session_state.chk_sel = None
                 st.query_params.clear()
-                st.rerun()
+                st.rerun(scope="app")
 
         if not room["started"]:
             st.subheader(f"⏳ Waiting Room ({len(players)}/{meta['max']} Players)")
-            st.write(f"Share code **`{code}`** (or copy the page URL) so friends can join!")
+            st.write(f"Share code **`{code}`** (or have friends click Join in Live Open Rooms)!")
             for idx, pid in enumerate(players):
                 host_tag = " *(Host)*" if pid == room["host"] else ""
                 st.markdown(f"**{idx + 1}.** {badges[pid]} **{names[pid]}**{host_tag}")
@@ -259,10 +278,13 @@ else:
                     room["winner"] = None
                     room["counted"] = False
                     room["state"] = init_game_state(room["game"], players)
-                    st.rerun()
+                    st.rerun(scope="app")
             else:
                 st.info(f"Waiting for **{names[room['host']]}** to start the match...")
             return
+
+        if not room.get("state"):
+            room["state"] = init_game_state(room["game"], players)
 
         if room["winner"] is not None:
             if not room["counted"]:
@@ -292,7 +314,7 @@ else:
                 room["counted"] = False
                 room["state"] = init_game_state(room["game"], players)
                 st.session_state.chk_sel = None
-                st.rerun()
+                st.rerun(scope="app")
 
         active_pid = players[room["turn_idx"] % len(players)]
         if room["winner"] is None and room["game"] not in ("Rock Paper Scissors", "Battleship"):
