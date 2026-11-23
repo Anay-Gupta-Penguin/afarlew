@@ -25,7 +25,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 .block-container {
-    padding-top: 2.8rem !important;
+    padding-top: 2.6rem !important;
     padding-bottom: 1.5rem !important;
 }
 div[data-testid="stHorizontalBlock"] {
@@ -54,6 +54,36 @@ if "nickname" not in st.session_state:
 
 my_pid = st.session_state.player_id
 REALTIME_3D_GAMES = ("1v1.LOL", "Battle Royale")
+
+
+def _join_room(code):
+    room = store["rooms"].get(code)
+    if not room:
+        st.error("Room not found.")
+        return
+    meta = GAMES[room["game"]]
+    already_in = my_pid in room["players"]
+    if not already_in and len(room["players"]) >= meta["max"]:
+        st.error(f"Room is full ({meta['max']}/{meta['max']} players).")
+        return
+    if not already_in and room["started"] and room["game"] not in REALTIME_3D_GAMES:
+        st.error("Match is already in progress.")
+        return
+
+    if not already_in:
+        idx = len(room["players"])
+        room["players"].append(my_pid)
+        room["names"][my_pid] = st.session_state.nickname or f"Player {idx + 1}"
+        room["badges"][my_pid] = PLAYER_BADGES[idx % len(PLAYER_BADGES)]
+        room["scores"][my_pid] = 0
+        if meta["max"] == 2 and len(room["players"]) == 2:
+            room["started"] = True
+            room["state"] = init_game_state(room["game"], room["players"])
+    room["last_active"] = time.time()
+    st.session_state.room_code = code
+    st.query_params["room"] = code
+    st.rerun()
+
 
 # --- LOBBY ---
 if not st.session_state.room_code:
@@ -99,37 +129,42 @@ if not st.session_state.room_code:
             st.rerun()
 
     with col2:
-        st.subheader("Join a Match")
+        st.subheader("Join by Room Code")
         join_code = st.text_input(
             "4-Character Room Code",
             value=prefill_code,
             max_chars=4,
         ).upper().strip()
         if st.button("Join Room", use_container_width=True):
-            room = store["rooms"].get(join_code)
-            if not room:
-                st.error("Room not found.")
-            else:
-                meta = GAMES[room["game"]]
-                already_in = my_pid in room["players"]
-                if not already_in and len(room["players"]) >= meta["max"]:
-                    st.error(f"Room is full ({meta['max']}/{meta['max']} players).")
-                elif not already_in and room["started"] and room["game"] not in REALTIME_3D_GAMES:
-                    st.error("Match is already in progress.")
-                else:
-                    if not already_in:
-                        idx = len(room["players"])
-                        room["players"].append(my_pid)
-                        room["names"][my_pid] = st.session_state.nickname or f"Player {idx + 1}"
-                        room["badges"][my_pid] = PLAYER_BADGES[idx % len(PLAYER_BADGES)]
-                        room["scores"][my_pid] = 0
-                        if meta["max"] == 2 and len(room["players"]) == 2:
-                            room["started"] = True
-                            room["state"] = init_game_state(room["game"], room["players"])
-                    room["last_active"] = time.time()
-                    st.session_state.room_code = join_code
-                    st.query_params["room"] = join_code
-                    st.rerun()
+            _join_room(join_code)
+
+    # --- LIVE OPEN ROOMS BROWSER (Auto-refreshes every 3s) ---
+    @st.fragment(run_every=3)
+    def open_rooms_list():
+        st.divider()
+        st.subheader("🌐 Live Open Rooms (1-Click Join)")
+        open_rooms = [
+            (c, r)
+            for c, r in store["rooms"].items()
+            if len(r["players"]) < GAMES[r["game"]]["max"]
+            and (not r["started"] or r["game"] in REALTIME_3D_GAMES)
+        ]
+        if not open_rooms:
+            st.caption("No open rooms right now — create one above and it will appear here for your friends!")
+            return
+
+        for c, r in open_rooms:
+            meta = GAMES[r["game"]]
+            host_name = r["names"].get(r["host"], "Player 1")
+            r_col1, r_col2 = st.columns([4, 1], vertical_alignment="center")
+            r_col1.markdown(
+                f"**{r['game']}** · Room `{c}` · Host: **{host_name}** · "
+                f"Players: **{len(r['players'])}/{meta['max']}**"
+            )
+            if r_col2.button("Join ➡️", key=f"quick_join_{c}", use_container_width=True):
+                _join_room(c)
+
+    open_rooms_list()
 
 # --- ACTIVE ROOM ---
 else:
@@ -155,7 +190,8 @@ else:
         with bar_left:
             st.info(
                 f"**{title_label}** · Room `{code}` · "
-                f"You: **{room['badges'][my_pid]} {room['names'][my_pid]}** · Share `{code}` for friends to join live!"
+                f"You: **{room['badges'][my_pid]} {room['names'][my_pid]}** · "
+                f"Friends can join from the Home Lobby or code `{code}`!"
             )
         with bar_right:
             if st.button("🚪 Leave", use_container_width=True):
