@@ -4,7 +4,7 @@ import time
 import streamlit as st
 
 from store import get_server_store, generate_room_code, PLAYER_BADGES
-from game_logic import GAMES, init_game_state, resolve_br_round
+from game_logic import GAMES, init_game_state
 from ui_ttt import render_ttt
 from ui_c4 import render_c4
 from ui_battleship import render_battleship
@@ -53,6 +53,7 @@ if "nickname" not in st.session_state:
     st.session_state.nickname = ""
 
 my_pid = st.session_state.player_id
+REALTIME_3D_GAMES = ("1v1.LOL", "Battle Royale")
 
 # --- LOBBY ---
 if not st.session_state.room_code:
@@ -78,12 +79,13 @@ if not st.session_state.room_code:
             code = generate_room_code(store)
             display_name = st.session_state.nickname or "Player 1"
             store["rooms"][code] = {
+                "code": code,
                 "game": game_choice,
                 "host": my_pid,
                 "players": [my_pid],
                 "names": {my_pid: display_name},
                 "badges": {my_pid: PLAYER_BADGES[0]},
-                "started": False,
+                "started": (game_choice in REALTIME_3D_GAMES),
                 "starter_idx": 0,
                 "turn_idx": 0,
                 "winner": None,
@@ -112,7 +114,7 @@ if not st.session_state.room_code:
                 already_in = my_pid in room["players"]
                 if not already_in and len(room["players"]) >= meta["max"]:
                     st.error(f"Room is full ({meta['max']}/{meta['max']} players).")
-                elif not already_in and room["started"]:
+                elif not already_in and room["started"] and room["game"] not in REALTIME_3D_GAMES:
                     st.error("Match is already in progress.")
                 else:
                     if not already_in:
@@ -144,6 +146,33 @@ else:
     room["last_active"] = time.time()
     meta = GAMES[room["game"]]
 
+    # --- 3D 1v1.LOL & FORTNITE BATTLE ROYALE ---
+    if room["game"] in REALTIME_3D_GAMES:
+        mode_tag = "1v1" if room["game"] == "1v1.LOL" else "br"
+        title_label = "🏗️ 1v1.LOL Build Fight" if mode_tag == "1v1" else "🪂 Fortnite Battle Royale"
+
+        bar_left, bar_right = st.columns([6.5, 1], vertical_alignment="center")
+        with bar_left:
+            st.info(
+                f"**{title_label}** · Room `{code}` · "
+                f"You: **{room['badges'][my_pid]} {room['names'][my_pid]}** · Share `{code}` for friends to join live!"
+            )
+        with bar_right:
+            if st.button("🚪 Leave", use_container_width=True):
+                if my_pid in room["players"]:
+                    room["players"].remove(my_pid)
+                    if room["players"]:
+                        room["host"] = room["players"][0]
+                    else:
+                        del store["rooms"][code]
+                st.session_state.room_code = None
+                st.query_params.clear()
+                st.rerun()
+
+        render_br(room, my_pid, arena_mode=mode_tag)
+        st.stop()
+
+    # --- TURN-BASED / PARTY GAMES ---
     @st.fragment(run_every=2)
     def live_match():
         players = room["players"]
@@ -165,14 +194,6 @@ else:
             if st.button("🚪 Leave", use_container_width=True):
                 if my_pid in room["players"]:
                     room["players"].remove(my_pid)
-                    if room["game"] == "Battle Royale" and room["started"] and room["winner"] is None:
-                        room["state"]["hp"][my_pid] = 0
-                        room["state"]["moves"].pop(my_pid, None)
-                        alive = [p for p in room["players"] if room["state"]["hp"].get(p, 0) > 0]
-                        if len(alive) == 1:
-                            room["winner"] = alive[0]
-                        elif alive and all(room["state"]["moves"].get(p) is not None for p in alive):
-                            resolve_br_round(room)
                     if room["players"]:
                         room["host"] = room["players"][0]
                         room["turn_idx"] = room["turn_idx"] % len(room["players"])
@@ -185,7 +206,6 @@ else:
                 st.query_params.clear()
                 st.rerun()
 
-        # --- WAITING ROOM / LOBBY ---
         if not room["started"]:
             st.subheader(f"⏳ Waiting Room ({len(players)}/{meta['max']} Players)")
             st.write(f"Share code **`{code}`** (or copy the page URL) so friends can join!")
@@ -208,7 +228,6 @@ else:
                 st.info(f"Waiting for **{names[room['host']]}** to start the match...")
             return
 
-        # --- WINNER / REMATCH BANNER ---
         if room["winner"] is not None:
             if not room["counted"]:
                 if room["winner"] == "DRAW":
@@ -239,9 +258,8 @@ else:
                 st.session_state.chk_sel = None
                 st.rerun()
 
-        # --- TURN BANNER ---
         active_pid = players[room["turn_idx"] % len(players)]
-        if room["winner"] is None and room["game"] not in ("Rock Paper Scissors", "Battleship", "Battle Royale"):
+        if room["winner"] is None and room["game"] not in ("Rock Paper Scissors", "Battleship"):
             if active_pid == my_pid:
                 st.success(f"🟢 **Your Turn!** ({badges[my_pid]} {names[my_pid]})")
             else:
@@ -250,9 +268,7 @@ else:
         my_turn = (active_pid == my_pid) and (room["winner"] is None)
         g = room["game"]
 
-        if g == "Battle Royale":
-            render_br(room, my_pid)
-        elif g == "Tic-Tac-Toe":
+        if g == "Tic-Tac-Toe":
             render_ttt(room, my_pid, my_turn)
         elif g == "Connect 4":
             render_c4(room, my_pid, my_turn)
