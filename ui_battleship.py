@@ -58,7 +58,7 @@ def _draw_aligned_ocean(ships_dict, shots_taken):
     st.markdown("".join(cells), unsafe_allow_html=True)
 
 
-def render_battleship(room, role, my_turn):
+def render_battleship(room, my_pid, my_turn):
     st.markdown("""
     <style>
     div[data-testid="stColumn"] div[data-testid="stVerticalBlock"],
@@ -75,15 +75,16 @@ def render_battleship(room, role, my_turn):
     </style>
     """, unsafe_allow_html=True)
 
+    p1_id, p2_id = room["players"][0], room["players"][1]
+    enemy_pid = p2_id if my_pid == p1_id else p1_id
+    names = room["names"]
     state = room["state"]
-    enemy = "P2" if role == "P1" else "P1"
-    names = room.get("names", {"P1": "Player 1", "P2": "Player 2"})
-    my_ships = state["ships"][role]
+    my_ships = state["ships"][my_pid]
 
-    # --- PHASE 1: PLACE YOUR FLEET ---
+    # --- PHASE 1: SETUP ---
     if state["phase"] == "SETUP":
-        if state["ready"][role]:
-            st.success(f"✅ Fleet locked in! Waiting for **{names[enemy]}** to finish placing ships...")
+        if state["ready"][my_pid]:
+            st.success(f"✅ Fleet locked in! Waiting for **{names[enemy_pid]}** to finish placing ships...")
             _draw_aligned_ocean(my_ships, set())
             return
 
@@ -97,8 +98,7 @@ def render_battleship(room, role, my_turn):
             )
             ship_labels = [f"{'✅' if n in my_ships else '🔹'} {n} ({s})" for n, s in FLEET_SPECS]
             choice = st.radio("1. Select Ship", ship_labels, index=default_idx)
-            sel_idx = ship_labels.index(choice)
-            name, size = FLEET_SPECS[sel_idx]
+            name, size = FLEET_SPECS[ship_labels.index(choice)]
 
             orient = st.radio("2. Direction", ["Horizontal", "Vertical"], horizontal=True)
             st.caption("3. Click any square on the grid to place or move.")
@@ -115,8 +115,8 @@ def render_battleship(room, role, my_turn):
                 type="primary",
                 use_container_width=True,
             ):
-                state["ready"][role] = True
-                if state["ready"]["P1"] and state["ready"]["P2"]:
+                state["ready"][my_pid] = True
+                if state["ready"][p1_id] and state["ready"][p2_id]:
                     state["phase"] = "BATTLE"
                 st.rerun()
 
@@ -133,10 +133,8 @@ def render_battleship(room, role, my_turn):
                 )
                 for c in range(10):
                     icon = "🚢" if (r, c) in occ else "🟦"
-                    if row_cols[c + 1].button(icon, key=f"setup_{role}_{r}_{c}", use_container_width=True):
-                        coords = (
-                            [(r, c + i) if orient == "Horizontal" else (r + i, c) for i in range(size)]
-                        )
+                    if row_cols[c + 1].button(icon, key=f"setup_{my_pid}_{r}_{c}", use_container_width=True):
+                        coords = [(r, c + i) if orient == "Horizontal" else (r + i, c) for i in range(size)]
                         other_cells = {pt for k, v in my_ships.items() if k != name for pt in v}
                         if any(x > 9 or y > 9 for x, y in coords):
                             st.toast(f"{name} goes off the edge from {ROWS[r]}{c+1}!", icon="⚠️")
@@ -154,10 +152,10 @@ def render_battleship(room, role, my_turn):
         if my_turn:
             st.success("🟢 **Your Turn!** Click any `🌊` square on the Target Radar to fire.")
         else:
-            st.info(f"⏳ Waiting for **{names[enemy]}** to fire...")
+            st.info(f"⏳ Waiting for **{names[enemy_pid]}** to fire...")
 
-    my_shots = state["shots"][role]
-    enemy_ships = state["ships"][enemy]
+    my_shots = state["shots"][my_pid]
+    enemy_ships = state["ships"][enemy_pid]
     enemy_occ = _occupied(enemy_ships)
     sunk_names = [n for n, coords in enemy_ships.items() if set(coords).issubset(my_shots)]
 
@@ -181,7 +179,7 @@ def render_battleship(room, role, my_turn):
                 icon = ("💥" if target in enemy_occ else "⚪") if already_shot else "🌊"
                 if row_cols[c + 1].button(
                     icon,
-                    key=f"fire_{role}_{r}_{c}",
+                    key=f"fire_{my_pid}_{r}_{c}",
                     disabled=(not my_turn or already_shot),
                     use_container_width=True,
                 ):
@@ -191,19 +189,19 @@ def render_battleship(room, role, my_turn):
                         hit_ship = next(n for n, coords in enemy_ships.items() if target in coords)
                         if set(enemy_ships[hit_ship]).issubset(my_shots):
                             state["last_event"] = (
-                                f"{names[role]} fired at {coord_label} — 💥 HIT & SUNK {names[enemy]}'s {hit_ship}!"
+                                f"{names[my_pid]} fired at {coord_label} — 💥 HIT & SUNK {names[enemy_pid]}'s {hit_ship}!"
                             )
                         else:
-                            state["last_event"] = f"{names[role]} fired at {coord_label} — 💥 HIT!"
+                            state["last_event"] = f"{names[my_pid]} fired at {coord_label} — 💥 HIT!"
                     else:
-                        state["last_event"] = f"{names[role]} fired at {coord_label} — 💦 MISS!"
+                        state["last_event"] = f"{names[my_pid]} fired at {coord_label} — 💦 MISS!"
 
                     if enemy_occ.issubset(my_shots):
-                        room["winner"] = role
+                        room["winner"] = my_pid
                     else:
-                        room["turn"] = enemy
+                        room["turn_idx"] = 1 - room["turn_idx"]
                     st.rerun()
 
     with right:
         st.markdown("**🚢 Your Fleet Status**")
-        _draw_aligned_ocean(my_ships, state["shots"][enemy])
+        _draw_aligned_ocean(my_ships, state["shots"][enemy_pid])
