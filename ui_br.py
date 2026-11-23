@@ -36,21 +36,35 @@ def render_br(room, my_pid, arena_mode="1v1"):
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<script>
+// Patch Streamlit's component iframe sandbox so Pointer Lock (mouse capture) & Fullscreen work
+(function unlockIframeCaps() {{
+  try {{
+    const fe = window.frameElement;
+    if (fe) {{
+      fe.setAttribute("allow", "fullscreen; pointer-lock; autoplay");
+      fe.allowFullscreen = true;
+      const sb = fe.getAttribute("sandbox") || "";
+      if (!sb.includes("allow-pointer-lock") && !sessionStorage.getItem("shs_sb_ok")) {{
+        sessionStorage.setItem("shs_sb_ok", "1");
+        fe.setAttribute("sandbox", (sb + " allow-pointer-lock").trim());
+        window.location.reload();
+      }}
+    }}
+  }} catch (e) {{}}
+}})();
+</script>
 <style>
   * {{ box-sizing: border-box; user-select: none; -webkit-user-select: none; }}
   html, body {{
     margin: 0; padding: 0; overflow: hidden;
     background: #070b14; font-family: system-ui, -apple-system, sans-serif; color: #f8fafc;
-    touch-action: none;
+    touch-action: none; width: 100%; height: 100%;
   }}
   #game-container {{
-    position: relative; width: 100vw; height: 660px; overflow: hidden;
-  }}
-  #game-container:fullscreen {{
-    width: 100vw; height: 100vh;
+    position: relative; width: 100vw; height: 100vh; overflow: hidden;
   }}
 
-  /* Crosshair & Hitmarker */
   #crosshair {{
     position: absolute; top: 50%; left: 50%;
     width: 22px; height: 22px; transform: translate(-50%, -50%);
@@ -73,7 +87,6 @@ def render_br(room, my_pid, arena_mode="1v1"):
   #hitmarker::before {{ top: 12px; left: 0; width: 26px; height: 2px; }}
   #hitmarker::after {{ left: 12px; top: 0; width: 2px; height: 26px; }}
 
-  /* Top HUD & Toolbar */
   #top-hud {{
     position: absolute; top: 10px; left: 12px; right: 12px;
     display: flex; justify-content: space-between; align-items: flex-start;
@@ -90,7 +103,7 @@ def render_br(room, my_pid, arena_mode="1v1"):
   }}
   .mini-btn {{
     background: #1e293b; color: #f8fafc; border: 1px solid #475569;
-    border-radius: 6px; padding: 4px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
+    border-radius: 6px; padding: 5px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
   }}
   .mini-btn:hover {{ background: #334155; }}
   .mini-btn.active {{ background: #2563eb; border-color: #60a5fa; }}
@@ -109,7 +122,6 @@ def render_br(room, my_pid, arena_mode="1v1"):
     color: #fef08a; display: none; z-index: 13; pointer-events: none;
   }}
 
-  /* Bottom HUD */
   #bottom-hud {{
     position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
     display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -146,9 +158,8 @@ def render_br(room, my_pid, arena_mode="1v1"):
   }}
   .slot span {{ display: block; font-size: 9px; color: #94a3b8; font-weight: 600; }}
 
-  /* Pre-Game Spawn Island Lobby Banner */
   #lobby-panel {{
-    position: absolute; inset: 0; background: rgba(7, 11, 20, 0.84);
+    position: absolute; inset: 0; background: rgba(7, 11, 20, 0.85);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     z-index: 25; text-align: center; padding: 18px;
   }}
@@ -168,7 +179,6 @@ def render_br(room, my_pid, arena_mode="1v1"):
   button.bot-btn {{ background: #059669; }}
   button.start-btn {{ background: #ea580c; }}
 
-  /* 3x3 Build Edit Modal */
   #edit-modal {{
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     background: rgba(15, 23, 42, 0.95); border: 2px solid #38bdf8;
@@ -185,7 +195,6 @@ def render_br(room, my_pid, arena_mode="1v1"):
     background: rgba(15, 23, 42, 0.5); border: 2px dashed #475569;
   }}
 
-  /* Touch Controls */
   #touch-layer {{
     position: absolute; inset: 0; pointer-events: none; z-index: 15; display: none;
   }}
@@ -239,7 +248,7 @@ def render_br(room, my_pid, arena_mode="1v1"):
       <div style="font-size:11px;margin-top:2px;" id="net-status">🟡 Connecting Lobby...</div>
       <div class="top-btns">
         <button class="mini-btn" id="fs-btn">⛶ Fullscreen</button>
-        <button class="mini-btn" id="lock-btn">🖱️ Lock Mouse</button>
+        <button class="mini-btn" id="lock-btn">🖱️ Capture Mouse</button>
         <button class="mini-btn" id="touch-toggle-btn">📱 Touch UI</button>
         <button class="mini-btn" id="lobby-open-btn">👥 Lobby</button>
       </div>
@@ -258,7 +267,6 @@ def render_br(room, my_pid, arena_mode="1v1"):
     <button class="action-btn" id="confirm-edit-btn" style="padding:6px 16px;font-size:13px;">✅ Confirm [G]</button>
   </div>
 
-  <!-- Mobile / Tablet Touch Controls -->
   <div id="touch-layer">
     <div id="joy-zone"><div id="joy-knob"></div></div>
     <div id="look-zone"></div>
@@ -300,7 +308,6 @@ def render_br(room, my_pid, arena_mode="1v1"):
     </div>
   </div>
 
-  <!-- Pre-Match Lobby Overlay -->
   <div id="lobby-panel">
     <h1 id="ov-title">🏗️ 1v1.LOL SPAWN LOBBY</h1>
     <p id="ov-sub">Room Code: <b>{code}</b> — Wait for your friend to appear below, or warm up in the arena right now!</p>
@@ -334,7 +341,7 @@ if (IS_BR) {{
   document.getElementById("minimap").style.display = "block";
 }}
 
-// --- PROCEDURAL CANVAS TEXTURE GENERATOR ---
+// --- PROCEDURAL TEXTURES ---
 function makeCanvasTex(drawFn, repeatX = 1, repeatY = 1) {{
   const c = document.createElement("canvas");
   c.width = 256; c.height = 256;
@@ -357,10 +364,8 @@ const TEX_WOOD = makeCanvasTex((ctx, w, h) => {{
     ctx.fillRect(0, y + 2, w, 28);
     ctx.fillStyle = "#451a03";
     ctx.fillRect(0, y, w, 2);
-    // Wood grain streaks
     ctx.fillStyle = "rgba(69, 26, 3, 0.28)";
     for (let g = 0; g < 6; g++) ctx.fillRect((g * 43 + i * 19) % w, y + 8 + g * 3, 38, 2);
-    // Nails
     ctx.fillStyle = "#1e293b";
     ctx.fillRect(10, y + 14, 4, 4);
     ctx.fillRect(w - 14, y + 14, 4, 4);
@@ -368,7 +373,7 @@ const TEX_WOOD = makeCanvasTex((ctx, w, h) => {{
 }});
 
 const TEX_BRICK = makeCanvasTex((ctx, w, h) => {{
-  ctx.fillStyle = "#cbd5e1"; // mortar
+  ctx.fillStyle = "#cbd5e1";
   ctx.fillRect(0, 0, w, h);
   const rows = 8, cols = 4;
   const rh = h / rows, cw = w / cols;
@@ -390,11 +395,8 @@ const TEX_METAL = makeCanvasTex((ctx, w, h) => {{
   ctx.fillStyle = "#64748b";
   for (let y = 16; y < h; y += 32) {{
     for (let x = 16; x < w; x += 32) {{
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillRect(-6, -2, 12, 4);
-      ctx.restore();
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
+      ctx.fillRect(-6, -2, 12, 4); ctx.restore();
     }}
   }}
 }});
@@ -405,9 +407,7 @@ const TEX_GRASS = makeCanvasTex((ctx, w, h) => {{
   for (let i = 0; i < 650; i++) {{
     const x = (i * 73) % w;
     const y = (i * 137) % h;
-    ctx.fillStyle = IS_BR
-      ? (i % 2 === 0 ? "#388e3c" : "#1b5e20")
-      : (i % 2 === 0 ? "#1e3a5f" : "#0f172a");
+    ctx.fillStyle = IS_BR ? (i % 2 === 0 ? "#388e3c" : "#1b5e20") : (i % 2 === 0 ? "#1e3a5f" : "#0f172a");
     ctx.fillRect(x, y, 3, 6);
   }}
   if (!IS_BR) {{
@@ -465,7 +465,7 @@ function playSfx(type) {{
   }}
 }}
 
-// --- THREE.JS SCENE & SKYBOX ---
+// --- THREE.JS SCENE ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(IS_BR ? 0x38bdf8 : 0x091122);
 scene.fog = new THREE.FogExp2(IS_BR ? 0x7dd3fc : 0x091122, IS_BR ? 0.0042 : 0.0055);
@@ -476,6 +476,15 @@ renderer.setSize(container.clientWidth, container.clientHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 container.insertBefore(renderer.domElement, container.firstChild);
+
+function onViewportResize() {{
+  const w = container.clientWidth || window.innerWidth;
+  const h = container.clientHeight || window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}}
+window.addEventListener("resize", onViewportResize);
 
 scene.add(new THREE.HemisphereLight(0xffffff, IS_BR ? 0x365314 : 0x1e293b, 1.05));
 const sun = new THREE.DirectionalLight(0xfffbeb, 1.0);
@@ -492,7 +501,6 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Scenic Perimeter Mountains + Clouds
 for (let i = 0; i < 20; i++) {{
   const a = (i / 20) * Math.PI * 2;
   const dist = MAP_HALF + 28 + (i % 3) * 14;
@@ -512,7 +520,6 @@ for (let i = 0; i < 20; i++) {{
   scene.add(cloud);
 }}
 
-// Storm Cylinder
 let stormRadius = IS_BR ? 78 : 999;
 const stormMesh = new THREE.Mesh(
   new THREE.CylinderGeometry(1, 1, 60, 48, 1, true),
@@ -523,7 +530,6 @@ stormMesh.scale.set(stormRadius, 1, stormRadius);
 stormMesh.visible = false;
 scene.add(stormMesh);
 
-// --- BR ISLAND PROPS ---
 const harvestNodes = [];
 const chests = [];
 if (IS_BR) {{
@@ -584,7 +590,7 @@ if (IS_BR) {{
   }});
 }}
 
-// --- BUILDING & 3x3 EDIT SYSTEM WITH TEXTURES ---
+// --- BUILDING & 3x3 EDIT SYSTEM ---
 const CELL = 4.0;
 const WALL_H = 3.2;
 const builds = new Map();
@@ -684,7 +690,7 @@ function build1v1StarterArena() {{
 }}
 build1v1StarterArena();
 
-// --- ANIMATED 3D CHARACTERS ---
+// --- PLAYER & CHARACTERS ---
 let matchStarted = false;
 const SPAWNS_1V1 = [[0, -6, 0], [0, 6, Math.PI], [-6, 0, -Math.PI/2], [6, 0, Math.PI/2]];
 const SPAWNS_BR  = [[-30, -30, 0], [30, 30, Math.PI], [-30, 30, 0], [30, -30, Math.PI], [0, -38, 0], [0, 38, Math.PI], [-38, 0, 0], [38, 0, Math.PI]];
@@ -712,29 +718,24 @@ function createAvatar(colorHex) {{
   const darkMat = new THREE.MeshStandardMaterial({{ color: 0x0f172a, roughness: 0.5 }});
   const visorMat = new THREE.MeshStandardMaterial({{ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.6 }});
 
-  // Legs
   const legL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.72, 0.28), darkMat);
   legL.position.set(-0.2, 0.36, 0); legL.castShadow = true; g.add(legL);
   const legR = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.72, 0.28), darkMat);
   legR.position.set(0.2, 0.36, 0); legR.castShadow = true; g.add(legR);
 
-  // Torso + Backpack
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.88, 0.44), suitMat);
   body.position.y = 1.15; body.castShadow = true; g.add(body);
   const pack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.24), darkMat);
   pack.position.set(0, 1.18, 0.32); g.add(pack);
 
-  // Head + Visor
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.52, 0.52), suitMat);
   head.position.y = 1.88; head.castShadow = true; g.add(head);
   const visor = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.16, 0.08), visorMat);
   visor.position.set(0, 1.9, -0.25); g.add(visor);
 
-  // Weapon
   const gun = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.18, 0.82), darkMat);
   gun.position.set(0.46, 1.25, -0.35); g.add(gun);
 
-  // Glider
   const glider = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 1.15), new THREE.MeshStandardMaterial({{ color: 0xfacc15 }}));
   glider.position.set(0, 2.55, 0); glider.visible = false; g.add(glider);
 
@@ -819,31 +820,65 @@ function flashHitmarker() {{
   setTimeout(() => {{ hm.style.opacity = "0"; }}, 110);
 }}
 
-// --- FULLSCREEN, POINTER LOCK & TOUCH CONTROLS ---
+// --- FULLSCREEN (Native + 100vw x 100vh Viewport Fallback) & MOUSE CAPTURE ---
 let mouseSens = 1.0;
+let theaterFullscreen = false;
 document.getElementById("sens-slider").addEventListener("input", e => {{
   mouseSens = parseFloat(e.target.value);
 }});
 
+function setTheaterFullscreen(active) {{
+  theaterFullscreen = active;
+  const fsBtn = document.getElementById("fs-btn");
+  fsBtn.classList.toggle("active", active);
+  fsBtn.textContent = active ? "🗗 Exit Full" : "⛶ Fullscreen";
+  try {{
+    const fe = window.frameElement;
+    if (fe) {{
+      if (active) {{
+        fe.dataset.origStyle = fe.getAttribute("style") || "";
+        fe.style.cssText = "position:fixed !important; top:0 !important; left:0 !important; width:100vw !important; height:100vh !important; z-index:999999 !important; border:none !important; background:#070b14 !important;";
+      }} else {{
+        fe.setAttribute("style", fe.dataset.origStyle || "width:100%; height:660px; border:none;");
+      }}
+    }}
+  }} catch (e) {{}}
+  setTimeout(onViewportResize, 50);
+}}
+
 document.getElementById("fs-btn").addEventListener("click", () => {{
-  if (!document.fullscreenElement) {{
-    if (container.requestFullscreen) container.requestFullscreen();
-    else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
-  }} else {{
-    if (document.exitFullscreen) document.exitFullscreen();
+  const next = !theaterFullscreen;
+  setTheaterFullscreen(next);
+  if (next) {{
+    if (container.requestFullscreen) container.requestFullscreen().catch(() => {{}});
+  }} else if (document.fullscreenElement) {{
+    document.exitFullscreen().catch(() => {{}});
   }}
+  if (!touchUIActive) requestMouseCapture();
+}});
+
+document.addEventListener("fullscreenchange", () => {{
+  if (!document.fullscreenElement && theaterFullscreen) {{
+    setTheaterFullscreen(false);
+  }}
+  onViewportResize();
 }});
 
 function requestMouseCapture() {{
-  if (renderer.domElement.requestPointerLock) {{
-    try {{ renderer.domElement.requestPointerLock(); }} catch (e) {{}}
+  const target = renderer.domElement;
+  if (target.requestPointerLock) {{
+    try {{
+      const res = target.requestPointerLock();
+      if (res && res.catch) res.catch(() => {{}});
+    }} catch (e) {{}}
   }}
 }}
 document.getElementById("lock-btn").addEventListener("click", requestMouseCapture);
-renderer.domElement.addEventListener("click", () => {{
-  if (isPlaying && !editingBuild && !pointerLocked) requestMouseCapture();
+renderer.domElement.addEventListener("mousedown", () => {{
+  if (isPlaying && !editingBuild && !pointerLocked && !touchUIActive) requestMouseCapture();
 }});
 
+// Touch UI
 let touchUIActive = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 const touchLayer = document.getElementById("touch-layer");
 const touchToggleBtn = document.getElementById("touch-toggle-btn");
@@ -854,7 +889,6 @@ function syncTouchUI() {{
 syncTouchUI();
 touchToggleBtn.addEventListener("click", () => {{ touchUIActive = !touchUIActive; syncTouchUI(); }});
 
-// Virtual Left Joystick
 let joyX = 0, joyY = 0;
 const joyZone = document.getElementById("joy-zone");
 const joyKnob = document.getElementById("joy-knob");
@@ -878,7 +912,6 @@ joyZone.addEventListener("touchend", () => {{
   joyKnob.style.transform = "translate(0px, 0px)";
 }});
 
-// Right-Side Touch Drag Camera Look
 let lookTouchId = null, lastTouchX = 0, lastTouchY = 0;
 const lookZone = document.getElementById("look-zone");
 lookZone.addEventListener("touchstart", e => {{
@@ -897,7 +930,6 @@ lookZone.addEventListener("touchmove", e => {{
   }}
 }}, {{ passive: false }});
 
-// Touch Action Buttons
 let touchFireHeld = false, touchJumpHeld = false;
 document.getElementById("t-fire").addEventListener("touchstart", e => {{ e.preventDefault(); touchFireHeld = true; triggerPrimaryAction(); }});
 document.getElementById("t-fire").addEventListener("touchend", () => {{ touchFireHeld = false; }});
@@ -951,21 +983,26 @@ function startOfficialMatch(broadcast = false) {{
 document.addEventListener("pointerlockchange", () => {{
   pointerLocked = (document.pointerLockElement === renderer.domElement);
   document.getElementById("lock-btn").classList.toggle("active", pointerLocked);
-  document.getElementById("lock-btn").textContent = pointerLocked ? "🔒 Mouse Locked" : "🖱️ Lock Mouse";
+  document.getElementById("lock-btn").textContent = pointerLocked ? "🔒 Mouse Captured" : "🖱️ Capture Mouse";
 }});
 
-let lastMouseX = null, lastMouseY = null;
+// Mouse Look (Pointer Lock + 360 Edge-Pan Fallback when Pointer Lock is blocked)
+let lastMouseX = null, lastMouseY = null, cursorNormX = 0.5;
 window.addEventListener("mousemove", e => {{
   if (!isPlaying || editingBuild || touchUIActive) return;
   const sens = (adsZoom ? 0.0014 : 0.0023) * mouseSens;
   if (pointerLocked) {{
     me.yaw -= e.movementX * sens;
     me.pitch = Math.max(-0.85, Math.min(1.05, me.pitch + e.movementY * sens));
-  }} else if (lastMouseX !== null) {{
-    me.yaw -= (e.clientX - lastMouseX) * sens * 1.25;
-    me.pitch = Math.max(-0.85, Math.min(1.05, me.pitch + (e.clientY - lastMouseY) * sens * 1.1));
+  }} else {{
+    const w = container.clientWidth || window.innerWidth;
+    cursorNormX = e.clientX / Math.max(1, w);
+    if (lastMouseX !== null) {{
+      me.yaw -= (e.clientX - lastMouseX) * sens * 1.4;
+      me.pitch = Math.max(-0.85, Math.min(1.05, me.pitch + (e.clientY - lastMouseY) * sens * 1.2));
+    }}
+    lastMouseX = e.clientX; lastMouseY = e.clientY;
   }}
-  lastMouseX = e.clientX; lastMouseY = e.clientY;
 }});
 
 window.addEventListener("mousedown", e => {{
@@ -1217,8 +1254,14 @@ function applyDamageToBot(dmg) {{
 // --- PHYSICS & WALK ANIMATION ---
 function stepPhysics(dt) {{
   if (!me.alive) return;
-  if (keys["ArrowLeft"]) me.yaw += 2.2 * dt;
-  if (keys["ArrowRight"]) me.yaw -= 2.2 * dt;
+  if (keys["ArrowLeft"]) me.yaw += 2.3 * dt;
+  if (keys["ArrowRight"]) me.yaw -= 2.3 * dt;
+
+  // Smooth 360 edge-panning if Pointer Lock isn't active on desktop
+  if (isPlaying && !pointerLocked && !touchUIActive && !editingBuild) {{
+    if (cursorNormX < 0.16) me.yaw += (0.16 - cursorNormX) * 14 * mouseSens * dt;
+    else if (cursorNormX > 0.84) me.yaw -= (cursorNormX - 0.84) * 14 * mouseSens * dt;
+  }}
 
   if (isPlaying && (mouseDown || touchFireHeld) && !editingBuild) {{
     if (["ar", "smg", "wall", "ramp", "floor", "cone"].includes(me.mode)) triggerPrimaryAction();
@@ -1348,7 +1391,7 @@ function stepBot(dt) {{
   upsertRemote(botState);
 }}
 
-// --- RESILIENT WEBRTC P2P MULTIPLAYER WITH STUN & AUTO-RECONNECT ---
+// --- WEBRTC MULTIPLAYER ---
 const ICE_CFG = {{
   iceServers: [
     {{ urls: "stun:stun.l.google.com:19302" }},
@@ -1412,7 +1455,6 @@ peer.on("open", () => {{
 }});
 peer.on("connection", conn => wireConn(conn));
 
-// Auto-retry connecting to Host every 2s until connected
 if (!CFG.isHost) {{
   setInterval(() => {{
     if (peer.open && (!hostConn || !hostConn.open)) {{
@@ -1551,4 +1593,4 @@ requestAnimationFrame(animate);
 </body>
 </html>
 """
-    components.html(html, height=665)
+    components.html(html, height=660)
